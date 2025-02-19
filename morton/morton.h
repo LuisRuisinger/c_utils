@@ -85,7 +85,7 @@ C_UTILS_INLINE static inline u64 morton_u32(u32 x) {
  * @return 64 bit encoded morton code by interleaving the 3 f32 from the vector.
  */
 C_UTILS_INLINE static inline u64 morton_vec(vec3f v, AABB *aabb) {
-#if defined(__AVX2__) && false
+#if defined(C_UTILS_AVX) && false
 
     // distributing over 21 bits to compress up to 3 dimensions into a single u64
     const u32 bit_mask = (1UL << 21) - 1;

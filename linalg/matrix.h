@@ -154,9 +154,9 @@ C_UTILS_INLINE static inline void mat2x2_mulm(
     __m128 _tmp_2 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(1, 2, 1, 2));
 
     __m128 _tmp_3 = _mm_mul_ps(ROW_128(a, 0), _mm_castsi128_ps(_tmp_0));
-    __m128 _tmp_4 = _mm_mul_ps(_mm_castsi128_ps(_tmp_1), _mm_castsi128_ps(_tmp_2));
+    __m128 _tmp_4 = _mm_fmadd_ps(_mm_castsi128_ps(_tmp_1), _mm_castsi128_ps(_tmp_2), _tmp_3);
 
-    ROW_128(c, 0) = _mm_add_ps(_tmp_3, _tmp_4);
+    ROW_128(c, 0) = _tmp_4;
 }
 
 C_UTILS_INLINE static inline void mat2x2_transpose(
@@ -170,10 +170,10 @@ C_UTILS_INLINE static inline void mat2x2_adjmul(
     __m128 _tmp_1 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(a, 0)), _MM_SHUFFLE(2, 2, 1, 1));
     __m128 _tmp_2 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(1, 0, 3, 2));
 
-    __m128 _tmp_3 = _mm_mul_ps(_mm_castsi128_ps(_tmp_0), ROW_128(b, 0));
-    __m128 _tmp_4 = _mm_mul_ps(_mm_castsi128_ps(_tmp_1), _mm_castsi128_ps(_tmp_2));
+    __m128 _tmp_3 = _mm_mul_ps(_mm_castsi128_ps(_tmp_1), _mm_castsi128_ps(_tmp_2));
+    __m128 _tmp_4 = _mm_fmsub_ps(_mm_castsi128_ps(_tmp_0), ROW_128(b, 0), _tmp_3);
 
-    ROW_128(c, 0) = _mm_sub_ps(_tmp_3, _tmp_4);
+    ROW_128(c, 0) = _tmp_4;
 }
 
 C_UTILS_INLINE static inline void mat2x2_muladj(
@@ -182,10 +182,10 @@ C_UTILS_INLINE static inline void mat2x2_muladj(
     __m128 _tmp_1 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(a, 0)), _MM_SHUFFLE(2, 3, 0, 1));
     __m128 _tmp_2 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(1, 2, 1, 2));
 
-    __m128 _tmp_3 = _mm_mul_ps(ROW_128(a, 0), _mm_castsi128_ps(_tmp_0));
-    __m128 _tmp_4 = _mm_mul_ps(_mm_castsi128_ps(_tmp_1), _mm_castsi128_ps( _tmp_2));
+    __m128 _tmp_3 = _mm_mul_ps(_mm_castsi128_ps(_tmp_1), _mm_castsi128_ps( _tmp_2));
+    __m128 _tmp_4 = _mm_fmsub_ps(ROW_128(a, 0), _mm_castsi128_ps(_tmp_0), _tmp_3);
 
-    ROW_128(c, 0) = _mm_sub_ps(_tmp_3, _tmp_4);
+    ROW_128(c, 0) = _tmp_4;
 }
 
 C_UTILS_INLINE static inline void mat4x4_muls(
@@ -227,29 +227,13 @@ C_UTILS_INLINE static inline void mat4x4_transpose(
     ROW_128(dst, 3) = _mm_shuffle_ps(_tmp_1, _tmp_3, 0xDD);
 }
 
-/* TODO test if the __AVX2__ variant is actually slower */
-C_UTILS_INLINE static inline vec4f mat4x4_mulv(const Mat4x4 *__restrict__ mat, vec4f v) {
-#if defined(__AVX2__)
-    __m256 _tmp_0 = _mm256_set_m128(_mm_set1_ps(VEC4_GET(v, 1)), _mm_set1_ps(VEC4_GET(v, 0)));
-    __m256 _tmp_1 = _mm256_set_m128(_mm_set1_ps(VEC4_GET(v, 3)), _mm_set1_ps(VEC4_GET(v, 2)));
-    __m256 _tmp_2 = _mm256_mul_ps(ROW_256(mat, 0), _tmp_0);
-    __m256 _tmp_3 = _mm256_mul_ps(ROW_256(mat, 1), _tmp_1);
-    __m256 _tmp_4 = _mm256_add_ps(_tmp_2, _tmp_3);
-
-    // combined multiplication for the first 2 rows and the last 2 rows
-    __m128 _tmp_5 = _mm_add_ps(_mm256_extractf128_ps(_tmp_4, 1), _mm256_castps256_ps128(_tmp_4));
-    return (vec4f) { .vec = _tmp_5 };
-
-#else
+C_UTILS_INLINE static inline vec4f mat4x4_mulv(const Mat4x4 *__restrict mat, vec4f v) {
     __m128 _tmp_0 = _mm_mul_ps(ROW_128(mat, 0), _mm_set1_ps(GET_VEC4_X(v)));
-    __m128 _tmp_1 = _mm_mul_ps(ROW_128(mat, 1), _mm_set1_ps(GET_VEC4_Y(v)));
-    __m128 _tmp_2 = _mm_mul_ps(ROW_128(mat, 2), _mm_set1_ps(GET_VEC4_Z(v)));
-    __m128 _tmp_3 = _mm_mul_ps(ROW_128(mat, 3), _mm_set1_ps(GET_VEC4_W(v)));
+    __m128 _tmp_1 = _mm_fmadd_ps(ROW_128(mat, 1), _mm_set1_ps(GET_VEC4_Y(v)), _tmp_0);
+    __m128 _tmp_2 = _mm_fmadd_ps(ROW_128(mat, 2), _mm_set1_ps(GET_VEC4_Z(v)), _tmp_1);
+    __m128 _tmp_3 = _mm_fmadd_ps(ROW_128(mat, 3), _mm_set1_ps(GET_VEC4_W(v)), _tmp_2);
 
-    __m128 _tmp_4 = _mm_add_ps(_mm_add_ps(_tmp_0, _tmp_1), _mm_add_ps(_tmp_2, _tmp_3));
-    return (vec4f) { .vec = _tmp_4 };
-
-#endif
+    return (vec4f) { .vec = _tmp_3 };
 }
 
 #if defined(__AVX2__)
@@ -260,11 +244,11 @@ C_UTILS_INLINE static inline __m256 mat4x4_mulv2(const Mat4x4 *__restrict__ mat,
     __m256 _tmp_3 = _mm256_shuffle_epi32(_mm256_castps_si256(pv), _MM_SHUFFLE(3, 3, 3, 3));
 
     __m256 _tmp_4 = _mm256_mul_ps(ROW_256(mat, 0), _mm256_castsi256_ps(_tmp_0));
-    __m256 _tmp_5 = _mm256_mul_ps(ROW_256(mat, 0), _mm256_castsi256_ps(_tmp_1));
-    __m256 _tmp_6 = _mm256_mul_ps(ROW_256(mat, 1), _mm256_castsi256_ps(_tmp_2));
-    __m256 _tmp_7 = _mm256_mul_ps(ROW_256(mat, 1), _mm256_castsi256_ps(_tmp_3));
+    __m256 _tmp_5 = _mm256_fmadd_ps(ROW_256(mat, 0), _mm256_castsi256_ps(_tmp_1), _tmp_4);
+    __m256 _tmp_6 = _mm256_fmadd_ps(ROW_256(mat, 1), _mm256_castsi256_ps(_tmp_2), _tmp_5);
+    __m256 _tmp_7 = _mm256_fmadd_ps(ROW_256(mat, 1), _mm256_castsi256_ps(_tmp_3), _tmp_6);
 
-    return _mm256_add_ps(_mm256_add_ps(_tmp_4, _tmp_5), _mm256_add_ps(_tmp_6, _tmp_7));
+    return _tmp_7;
 }
 #endif
 
@@ -282,11 +266,11 @@ C_UTILS_INLINE static inline __m512 mat4x4_mulv4(const Mat4x4 *__restrict__ mat,
     _tmp_5 = _mm512_inserti64x4(_tmp_5, _mm256_castps_si256(ROW_256(mat, 1)), 1);
 
     __m512 _tmp_6 = _mm512_mul_ps(_mm512_castsi512_ps(_tmp_4), _mm512_castsi512_ps(_tmp_0));
-    __m512 _tmp_7 = _mm512_mul_ps(_mm512_castsi512_ps(_tmp_4), _mm512_castsi512_ps(_tmp_1));
-    __m512 _tmp_8 = _mm512_mul_ps(_mm512_castsi512_ps(_tmp_5), _mm512_castsi512_ps(_tmp_2));
-    __m512 _tmp_9 = _mm512_mul_ps(_mm512_castsi512_ps(_tmp_5), _mm512_castsi512_ps(_tmp_3));
+    __m512 _tmp_7 = _mm512_fmadd_ps(_mm512_castsi512_ps(_tmp_4), _mm512_castsi512_ps(_tmp_1), _tmp_6);
+    __m512 _tmp_8 = _mm512_fmadd_ps(_mm512_castsi512_ps(_tmp_5), _mm512_castsi512_ps(_tmp_2), _tmp_7);
+    __m512 _tmp_9 = _mm512_fmadd_ps(_mm512_castsi512_ps(_tmp_5), _mm512_castsi512_ps(_tmp_3), _tmp_8);
 
-    return _mm512_add_ps(_mm512_add_ps(_tmp_6, _tmp_7), _mm512_add_ps(_tmp_8, _tmp_9));
+    return _tmp_9;
 }
 #endif
 

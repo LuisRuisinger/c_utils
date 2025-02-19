@@ -1,7 +1,3 @@
-//
-// Created by Luis Ruisinger on 01.12.24.
-//
-
 #ifndef C_UTILS_ARRAY_H
 #define C_UTILS_ARRAY_H
 
