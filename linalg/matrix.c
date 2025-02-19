@@ -105,8 +105,11 @@ void mat4x4_inverse_tns(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst
     _tmp_1 = _mm_mul_ps(ROW_128(dst, 1), _mm_castsi128_ps(_tmp_1));
     _tmp_2 = _mm_mul_ps(ROW_128(dst, 2), _mm_castsi128_ps(_tmp_2));
 
-    ROW_128(dst, 3) = _mm_add_ps(_mm_add_ps(_tmp_0, _tmp_1), _tmp_2);
-    ROW_128(dst, 3) = _mm_sub_ps(_mm_setr_ps(0.0F, 0.0F, 0.0F, 1.0F), ROW_128(dst, 3));
+    __m128 _tmp_3 = _mm_mul_ps(ROW_128(dst, 0), _mm_castsi128_ps(_tmp_0));
+    __m128 _tmp_4 = _mm_fmadd_ps(ROW_128(dst, 1), _mm_castsi128_ps(_tmp_1), _tmp_3);
+    __m128 _tmp_5 = _mm_fmadd_ps(ROW_128(dst, 2), _mm_castsi128_ps(_tmp_2), _tmp_4);
+
+    ROW_128(dst, 3) = _mm_sub_ps(_mm_setr_ps(0.0F, 0.0F, 0.0F, 1.0F), _tmp_5);
 }
 
 void mat4x4_inverse_t(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) {
