@@ -66,9 +66,10 @@
 
 #if defined(__GNUC__) || defined(__clang__)
     #define PRINT_FMT(pos_fmt, pos_arg) __attribute__((format(__printf__, pos_fmt, pos_arg)))
-    #define C_UTILS_INLINE               __attribute__((C_UTILS_INLINE))
+    #define C_UTILS_INLINE              __attribute__((C_UTILS_INLINE))
 #else
     #define PRINT_FMT(pos_fmt, pos_arg)
+
 #endif
 
 // e.g. not working on widows
