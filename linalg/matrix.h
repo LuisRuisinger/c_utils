@@ -1,27 +1,46 @@
 #ifndef C_UTILS_MATRIX_H
 #define C_UTILS_MATRIX_H
 
+#include <string.h>
+
 #include "../defines.h"
 #include "vec3.h"
 #include "vec2.h"
+#include "vec.h"
 
 C_GUARD_BEGINN()
 
-#if defined(__AVX512F__)
+#if defined(C_UTILS_AVX512F)
     #define MAT_ALIGNMENT 64
-#elif defined(__AVX2__)
+#elif defined(C_UTILS_AVX)
     #define MAT_ALIGNMENT 32
 #else
     #define MAT_ALIGNMENT 16
 #endif
 
+
+
+
+
+/**
+ * @brief Definition of a 2x2 matrix. Struct itself stores the entire matrix. 
+ *        Underlying storage is aligned to 128 bit SIMD register.  
+ */
 typedef struct Mat2x2_t {
     union {
         alignas(16) f32 val[4];
-        alignas(16) __m128 row;
+        __m128 row;
     };
 } __attribute__((aligned(16))) Mat2x2;
 
+
+
+
+
+/**
+ * @brief Definition of a 4x4 matrix. Struct itself stores the entire matrix. 
+ *        Underlying storage is aligned to the biggest available SIMD register of the ISA. 
+ */
 typedef struct Mat4x4_t {
     union {
         alignas(MAT_ALIGNMENT) f32 val[16];
@@ -29,18 +48,26 @@ typedef struct Mat4x4_t {
     };
 } __attribute__((aligned(MAT_ALIGNMENT))) Mat4x4;
 
-#if defined(__AVX512F__)
+
+
+
+
+#if defined(C_UTILS_AVX512F)
 #define ROW_512(mat, i) \
     *((__m512*) &(mat)->val + i)
 #endif
 
-#if defined(__AVX2__)
+#if defined(C_UTILS_AVX)
 #define ROW_256(mat, i) \
     *((__m256*) &(mat)->val + i)
 #endif
 
 #define ROW_128(mat, i) \
     *((__m128*) &(mat)->val + i)
+
+
+
+
 
 C_UTILS_INLINE static inline Mat2x2 mat2x2_identity(void) {
 
@@ -54,88 +81,126 @@ C_UTILS_INLINE static inline Mat2x2 mat2x2_zeroed(void) {
     return (Mat2x2) { .row = _mm_set1_ps(0.0F) };
 }
 
-C_UTILS_INLINE static inline f32 mat2x2_det(const Mat2x2 *__restrict__ mat) {
+C_UTILS_INLINE static inline f32 mat2x2_det(const Mat2x2 *__restrict mat) {
     return (mat->val[0] * mat->val[3]) - (mat->val[1] * mat->val[2]);
 }
 
+/**
+ * @brief  Function to emit a 4x4 identity matrix.
+ *         Note: Using memcpy rather than explicit SIMD loads results in poor codegen. 
+ * @return 4x4 identity matrix. 
+ */
 C_UTILS_INLINE static inline Mat4x4 mat4x4_identity(void) {
-#if defined(__AVX512F__)
+    const alignas(MAT_ALIGNMENT) f32 arr[16] = {
+        0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F,
+        1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F
+    };
+
+#if defined(C_UTILS_AVX512F)
     Mat4x4 mat;
 
     // this does not care about row-major / column-major ordering
-    ROW_512(&mat, 0) = _mm512_set_ps(
-            0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F,
-            1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F);
-
+    ROW_512(&mat, 0) = _mm512_load_ps(arr);
     return mat;
 
-#elif defined(__AVX2__)
+#elif defined(C_UTILS_AVX)
     Mat4x4 mat;
 
     // this does not care about row-major / column-major ordering
-    ROW_256(&mat, 0) = _mm256_set_ps(0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
-    ROW_256(&mat, 1) = _mm256_set_ps(1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F);
+    //ROW_256(&mat, 0) = _mm256_set_ps(0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
+    //ROW_256(&mat, 1) = _mm256_set_ps(1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F);
 
+    ROW_256(&mat, 0) = _mm256_load_ps(arr);
+    ROW_256(&mat, 1) = _mm256_load_ps(arr + 8);
     return mat;
 
 #else
     Mat4x4 mat;
 
     // this does not care about row-major / column-major ordering
-    ROW_128(&mat, 0) = _mm_set_ps(0.0F, 0.0F, 0.0F, 1.0F);
-    ROW_128(&mat, 1) = _mm_set_ps(0.0F, 0.0F, 1.0F, 0.0F);
-    ROW_128(&mat, 2) = _mm_set_ps(0.0F, 1.0F, 0.0F, 0.0F);
-    ROW_128(&mat, 0) = _mm_set_ps(1.0F, 0.0F, 0.0F, 0.0F);
-
+    ROW_128(&mat, 0) = _mm_load_ps(arr);
+    ROW_128(&mat, 1) = _mm_load_ps(arr + 4);
+    ROW_128(&mat, 2) = _mm_load_ps(arr + 8);
+    ROW_128(&mat, 0) = _mm_load_ps(arr + 12);
     return mat;
 
 #endif
 }
 
+/**
+ * @brief  Function to emit a zero-ed 4x4 matrix.  
+ * @return Zero-ed 4x4 matrix. 
+ */
 C_UTILS_INLINE static inline Mat4x4 mat4x4_zeroed(void) {
-#if defined(__AVX512F__)
     Mat4x4 mat;
-
-    // this does not care about row-major / column-major ordering
-    ROW_512(&mat, 0) = _mm512_set1_ps(0.0F);
+    memset(&mat.val, 0, sizeof(mat.val));
 
     return mat;
-
-#elif defined(__AVX2__)
-    Mat4x4 mat;
-
-    // this does not care about row-major / column-major ordering
-    ROW_256(&mat, 0) = _mm256_set1_ps(0.0F);
-    ROW_256(&mat, 1) = _mm256_set1_ps(0.0F);
-
-    return mat;
-
-#else
-    Mat4x4 mat;
-
-    // this does not care about row-major / column-major ordering
-    ROW_128(&mat, 0) = _mm_set1_ps(0.0F);
-    ROW_128(&mat, 1) = _mm_set1_ps(0.0F);
-    ROW_128(&mat, 2) = _mm_set1_ps(0.0F);
-    ROW_128(&mat, 0) = _mm_set1_ps(1.0F);
-
-    return mat;
-
-#endif
 }
 
-C_UTILS_INLINE static inline f32 mat4x4_det(const Mat4x4 *__restrict__ mat) {
+/** 
+ * @brief  Determinant calculation for a arbitrary 4x4 matrices through the rule of Sarrus applied
+ *         on 4x4 matrices. 
+ * @param  mat The input matrix for calculating det(mat).    
+ * @return det(mat)
+ */
+C_UTILS_INLINE static inline f32 mat4x4_det(const Mat4x4 *__restrict mat) {
+    
+    // src: https://stackoverflow.com/a/2980966
+    return 
+        (mat->val[3] * mat->val[6] * mat->val[9]  * mat->val[12]) - 
+        (mat->val[2] * mat->val[7] * mat->val[9]  * mat->val[12]) - 
+        (mat->val[3] * mat->val[5] * mat->val[10] * mat->val[12]) + 
+        (mat->val[1] * mat->val[7] * mat->val[10] * mat->val[12]) + 
+        (mat->val[2] * mat->val[5] * mat->val[11] * mat->val[12]) - 
+        (mat->val[1] * mat->val[6] * mat->val[11] * mat->val[12]) - 
+        (mat->val[3] * mat->val[6] * mat->val[8]  * mat->val[13]) + 
+        (mat->val[2] * mat->val[7] * mat->val[8]  * mat->val[13]) + 
+        (mat->val[3] * mat->val[4] * mat->val[10] * mat->val[13]) -
+        (mat->val[0] * mat->val[7] * mat->val[10] * mat->val[13]) - 
+        (mat->val[2] * mat->val[4] * mat->val[11] * mat->val[13]) + 
+        (mat->val[0] * mat->val[6] * mat->val[11] * mat->val[13]) + 
+        (mat->val[3] * mat->val[5] * mat->val[8]  * mat->val[14]) - 
+        (mat->val[1] * mat->val[7] * mat->val[8]  * mat->val[14]) - 
+        (mat->val[3] * mat->val[4] * mat->val[9]  * mat->val[14]) + 
+        (mat->val[0] * mat->val[7] * mat->val[9]  * mat->val[14]) + 
+        (mat->val[1] * mat->val[4] * mat->val[11] * mat->val[14]) - 
+        (mat->val[0] * mat->val[5] * mat->val[11] * mat->val[14]) - 
+        (mat->val[2] * mat->val[5] * mat->val[8]  * mat->val[15]) + 
+        (mat->val[1] * mat->val[6] * mat->val[8]  * mat->val[15]) + 
+        (mat->val[2] * mat->val[4] * mat->val[9]  * mat->val[15]) - 
+        (mat->val[0] * mat->val[6] * mat->val[9]  * mat->val[15]) - 
+        (mat->val[1] * mat->val[4] * mat->val[10] * mat->val[15]) + 
+        (mat->val[0] * mat->val[5] * mat->val[10] * mat->val[15]);
+}
 
-    /* TODO */
-    return -1.0F;
+/**
+ * @brief  Determinant calculation for a 4x4 affine transformation matrices.
+ *         Such matrix is composed of
+ *         | A   0_v |
+ *         | 0_v 1   | 
+ *         which allows the laplace extension to det(M) = 1 * det(A) and just discards the other
+ *         sub-matrices because of the 0_v's.
+ *         The det(M) = det(A) can be calculated using the rule of Sarrus. 
+ *         The order of the matrix does not matter as det(M^T) = det(M) and therefore 
+ *         | A   0_v |^T        | A^T 0_v |
+ *         | 0_v 1   |   equals | 0_v 1   | which yields det(A^T) = det(A)
+ * @param  mat The input matrix for calculating det(mat).    
+ * @return det(mat)
+ */
+C_UTILS_INLINE static inline f32 mat4x4_det_tm(const Mat4x4 *__restrict mat) {
+    return 
+        mat->val[0] * (mat->val[5] * mat->val[10] - mat->val[9] * mat->val[6]) - 
+        mat->val[0] * (mat->val[1] * mat->val[10] - mat->val[9] * mat->val[2]) +
+        mat->val[4] * (mat->val[1] * mat->val[6]  - mat->val[5] * mat->val[2]);
 }
 
 C_UTILS_INLINE static inline void mat2x2_muls(
-        const Mat2x2 *__restrict__ src, Mat2x2 *__restrict__ dst, f32 s) {
+        const Mat2x2 *__restrict src, Mat2x2 *__restrict dst, f32 s) {
     ROW_128(dst, 0) = _mm_mul_ps(ROW_128(src, 0), _mm_set1_ps(s));
 }
 
-C_UTILS_INLINE static inline vec2f mat2x2_mulv(const Mat2x2 *__restrict__ src, vec2f v) {
+C_UTILS_INLINE static inline vec2f mat2x2_mulv(const Mat2x2 *__restrict src, vec2f v) {
     __m128 _tmp_0 = _mm_shuffle_ps(ROW_128(src, 0), ROW_128(src, 0), _MM_SHUFFLE(3, 1, 2, 0));
     __m128 _tmp_1 = _mm_set_ps(GET_VEC2_X(v), GET_VEC2_Y(v), GET_VEC2_X(v), GET_VEC2_Y(v));
     _tmp_1 = _mm_mul_ps(_tmp_0, _tmp_1);
@@ -148,7 +213,7 @@ C_UTILS_INLINE static inline vec2f mat2x2_mulv(const Mat2x2 *__restrict__ src, v
 }
 
 C_UTILS_INLINE static inline void mat2x2_mulm(
-        const Mat2x2 *__restrict__ a, const Mat2x2 *__restrict__ b, Mat2x2 *__restrict__ c) {
+        const Mat2x2 *__restrict a, const Mat2x2 *__restrict b, Mat2x2 *__restrict c) {
     __m128 _tmp_0 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(3, 0, 3, 0));
     __m128 _tmp_1 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(a, 0)), _MM_SHUFFLE(2, 3, 0, 1));
     __m128 _tmp_2 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(1, 2, 1, 2));
@@ -160,12 +225,12 @@ C_UTILS_INLINE static inline void mat2x2_mulm(
 }
 
 C_UTILS_INLINE static inline void mat2x2_transpose(
-        const Mat2x2 *__restrict__ src, Mat2x2 *__restrict__ dst) {
+        const Mat2x2 *__restrict src, Mat2x2 *__restrict dst) {
     ROW_128(dst, 0) = _mm_shuffle_ps(ROW_128(src, 0), ROW_128(src, 0), _MM_SHUFFLE(3, 1, 2, 0));
 }
 
 C_UTILS_INLINE static inline void mat2x2_adjmul(
-        const Mat2x2 *__restrict__ a, const Mat2x2 *__restrict__ b, Mat2x2 *__restrict__ c) {
+        const Mat2x2 *__restrict a, const Mat2x2 *__restrict b, Mat2x2 *__restrict c) {
     __m128 _tmp_0 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(a, 0)), _MM_SHUFFLE(0, 3, 0, 3));
     __m128 _tmp_1 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(a, 0)), _MM_SHUFFLE(2, 2, 1, 1));
     __m128 _tmp_2 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(1, 0, 3, 2));
@@ -177,7 +242,7 @@ C_UTILS_INLINE static inline void mat2x2_adjmul(
 }
 
 C_UTILS_INLINE static inline void mat2x2_muladj(
-        const Mat2x2 *__restrict__ a, const Mat2x2 *__restrict__ b, Mat2x2 *__restrict__ c) {
+        const Mat2x2 *__restrict a, const Mat2x2 *__restrict b, Mat2x2 *__restrict c) {
     __m128 _tmp_0 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(0, 3, 0, 3));
     __m128 _tmp_1 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(a, 0)), _MM_SHUFFLE(2, 3, 0, 1));
     __m128 _tmp_2 = _mm_shuffle_epi32(_mm_castps_si128(ROW_128(b, 0)), _MM_SHUFFLE(1, 2, 1, 2));
@@ -189,14 +254,14 @@ C_UTILS_INLINE static inline void mat2x2_muladj(
 }
 
 C_UTILS_INLINE static inline void mat4x4_muls(
-        const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst, f32 s) {
-#if defined(__AVX512F__)
+        const Mat4x4 *__restrict src, Mat4x4 *__restrict dst, f32 s) {
+#if defined(C_UTILS_AVX512F)
     __m512 _tmp_0 = _mm512_set1_ps(s);
 
     // this does not care about row-major / column-major ordering
     ROW_512(dst, 0) = _mm512_mul_ps(ROW_512(src, 0), _tmp_0);
 
-#elif defined(__AVX2__)
+#elif defined(C_UTILS_AVX)
     __m256 _tmp_0 = _mm256_set1_ps(s);
 
     // this does not care about row-major / column-major ordering
@@ -215,7 +280,7 @@ C_UTILS_INLINE static inline void mat4x4_muls(
 }
 
 C_UTILS_INLINE static inline void mat4x4_transpose(
-        const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) {
+        const Mat4x4 *__restrict src, Mat4x4 *__restrict dst) {
     __m128 _tmp_0 = _mm_shuffle_ps(ROW_128(src, 0), ROW_128(src, 1), 0x44);
     __m128 _tmp_1 = _mm_shuffle_ps(ROW_128(src, 0), ROW_128(src, 1), 0xEE);
     __m128 _tmp_2 = _mm_shuffle_ps(ROW_128(src, 2), ROW_128(src, 3), 0x44);
@@ -236,8 +301,8 @@ C_UTILS_INLINE static inline vec4f mat4x4_mulv(const Mat4x4 *__restrict mat, vec
     return (vec4f) { .vec = _tmp_3 };
 }
 
-#if defined(__AVX2__)
-C_UTILS_INLINE static inline __m256 mat4x4_mulv2(const Mat4x4 *__restrict__ mat, __m256 pv) {
+#if defined(C_UTILS_AVX)
+C_UTILS_INLINE static inline __m256 mat4x4_mulv2(const Mat4x4 *__restrict mat, __m256 pv) {
     __m256 _tmp_0 = _mm256_shuffle_epi32(_mm256_castps_si256(pv), _MM_SHUFFLE(0, 0, 0, 0));
     __m256 _tmp_1 = _mm256_shuffle_epi32(_mm256_castps_si256(pv), _MM_SHUFFLE(1, 1, 1, 1));
     __m256 _tmp_2 = _mm256_shuffle_epi32(_mm256_castps_si256(pv), _MM_SHUFFLE(2, 2, 2, 2));
@@ -252,8 +317,8 @@ C_UTILS_INLINE static inline __m256 mat4x4_mulv2(const Mat4x4 *__restrict__ mat,
 }
 #endif
 
-#if defined(__AVX512F__)
-C_UTILS_INLINE static inline __m512 mat4x4_mulv4(const Mat4x4 *__restrict__ mat, __m512 pv) {
+#if defined(C_UTILS_AVX512F)
+C_UTILS_INLINE static inline __m512 mat4x4_mulv4(const Mat4x4 *__restrict mat, __m512 pv) {
     __m512 _tmp_0 = _mm512_shuffle_epi32(_mm512_castps_si512(pv), _MM_SHUFFLE(0, 0, 0, 0));
     __m512 _tmp_1 = _mm512_shuffle_epi32(_mm512_castps_si512(pv), _MM_SHUFFLE(1, 1, 1, 1));
     __m512 _tmp_2 = _mm512_shuffle_epi32(_mm512_castps_si512(pv), _MM_SHUFFLE(2, 2, 2, 2));
@@ -275,15 +340,15 @@ C_UTILS_INLINE static inline __m512 mat4x4_mulv4(const Mat4x4 *__restrict__ mat,
 #endif
 
 C_UTILS_INLINE static inline void mat4x4_mulm(
-        const Mat4x4 *__restrict__ a, const Mat4x4 *__restrict__ b, Mat4x4 *__restrict__ c) {
+        const Mat4x4 *__restrict a, const Mat4x4 *__restrict b, Mat4x4 *__restrict c) {
 
-    // 4x4 matrices are stored in row-major order rather than column-major to speed up
+    // 4x4 matrices are stored in column-major order rather than row-major to speed up
     // 4x4 matrix vector and matrix multiplication
     // this implies that b itself doesn't need to be transposed to linearize the multiplication
-#if defined(__AVX512F__)
+#if defined(C_UTILS_AVX512F)
     ROW_512(c, 0) = mat4x4_mulv4(a, ROW_512(b, 0));
 
-#elif defined(__AVX2__)
+#elif defined(C_UTILS_AVX)
     ROW_256(c, 0) = mat4x4_mulv2(a, ROW_256(b, 0));
     ROW_256(c, 1) = mat4x4_mulv2(a, ROW_256(b, 1));
 
@@ -296,36 +361,38 @@ C_UTILS_INLINE static inline void mat4x4_mulm(
 #endif
 }
 
-C_UTILS_INLINE static inline Mat4x4 mat4x4_from_rvec(const vec3f v[4]) {
-
-    // 4x4 matrices are stored in row-major order rather than column-major to speed up
+C_UTILS_INLINE static inline Mat4x4 mat4x4_from_cvec(const vec4f v[4]) {
+    Mat4x4 mat; 
+    
+    // 4x4 matrices are stored in column-major order rather than row-major to speed up
     // 4x4 matrix vector and matrix multiplication
-    return (Mat4x4) { .rows = { v[0].vec, v[1].vec, v[2].vec, v[3].vec } };
+    memcpy(mat.val, v, sizeof(vec4f) * 4);
+    return mat;
 }
 
-C_UTILS_INLINE static inline Mat4x4 mat4x4_from_cvec(const vec3f v[4]) {
+C_UTILS_INLINE static inline Mat4x4 mat4x4_from_rvec(const vec3f v[4]) {
 
-    // transpose needed to ensure row-major order
-    Mat4x4 mat = mat4x4_from_rvec(v);
+    // transpose needed to ensure column-major order
+    Mat4x4 mat = mat4x4_from_cvec(v);
     Mat4x4 dst;
 
     mat4x4_transpose(&mat, &dst);
     return dst;
 }
 
-C_UTILS_INLINE static inline Mat2x2 mat4x4_to_mat2x2(const Mat4x4 *__restrict__ src) {
+C_UTILS_INLINE static inline Mat2x2 mat4x4_to_mat2x2(const Mat4x4 *__restrict src) {
     Mat2x2 mat = { .row = _mm_movelh_ps(ROW_128(src, 0), ROW_128(src, 1)) };
     Mat2x2 dst;
 
-    // 2x2 matrices are stored in column-major order in contrast to
-    // the row-major representation of 4x4 matrices
+    // 2x2 matrices are stored in row-major order in contrast to
+    // the column-major representation of 4x4 matrices
     mat2x2_transpose(&mat, &dst);
     return dst;
 }
 
-C_UTILS_INLINE static inline Mat4x4 mat2x2_to_mat4x4(const Mat2x2 *__restrict__ src) {
+C_UTILS_INLINE static inline Mat4x4 mat2x2_to_mat4x4(const Mat2x2 *__restrict src) {
 
-    // assumes column-major ordering in 2x2 matrices
+    // assumes row-major ordering in 2x2 matrices
     Mat2x2 mat;
     mat2x2_transpose(src, &mat);
 
@@ -337,33 +404,56 @@ C_UTILS_INLINE static inline Mat4x4 mat2x2_to_mat4x4(const Mat2x2 *__restrict__ 
 }
 
 /**
- * @brief Computes the inverse of an arbitrary 2x2 matrix in columm-major order
+ * @brief Computes the inverse of an arbitrary 2x2 matrix in row-major order
  * @param src The source transformation matrix.
  * @param dst The destination transformation matrix where we want to store the inverse of src.
  */
-void mat2x2_inverse(const Mat2x2 *__restrict__ src, Mat2x2 *__restrict__ dst);
+void mat2x2_inverse(const Mat2x2 *__restrict src, Mat2x2 *__restrict dst);
 
 /**
- * @brief Computes the inverse of an arbitrary 4x4 matrix in row-major order
+ * @brief Computes the inverse of an arbitrary 4x4 matrix in column-major order
  * @param src The source transformation matrix.
  * @param dst The destination transformation matrix where we want to store the inverse of src.
  */
-void mat4x4_inverse(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst);
+void mat4x4_inverse(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst);
 
 /**
- * @brief Computes the inverse of a transformation matrix in row-major order
+ * @brief Computes the inverse of an affine transformation matrix in column-major order
  *        which does not apply any scaling.
  * @param src The source transformation matrix.
  * @param dst The destination transformation matrix where we want to store the inverse of src.
  */
-void mat4x4_inverse_tns(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst);
+void mat4x4_inverse_tns(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst);
 
 /**
- * @brief Computes the inverse of a general transformation matrix in row-major order
+ * @brief Computes the inverse of a general transformation matrix in column-major order
  * @param src The source transformation matrix.
  * @param dst The destination transformation matrix where we want to store the inverse of src.
  */
-void mat4x4_inverse_t(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst);
+void mat4x4_inverse_t(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst);
+
+
+
+
+
+/**
+ * @brief Definition of an arbitrary m x n matrix.
+ *        The storage of such allocation will always be aligned to MAT_ALIGNMENT.
+ *        The storage will always be padded to a multiple of 
+ */
+typedef struct Mat_t {
+    // compiler assumption for the pointed to location to be aligned to MAT_ALIGNMENT
+    // the assumption will be applied through runtime overload of function using this type. 
+    f32 *val;
+
+    // convention for width, height naming scheme of matrices
+    // n is the width and m the height of the matrix
+    usize n, m;
+} Mat;
+
+void mat_mulv(const Mat *__restrict mat, const Vec *__restrict v, Vec *__restrict w);
+
+void mat_mulm(const Mat *__restrict a, const Mat *__restrict b, Mat *__restrict c);
 
 C_GUARD_END()
 

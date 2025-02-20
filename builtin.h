@@ -30,6 +30,10 @@ typedef ssize_t  ssize;
 
 #if defined(C_UTILS_X86)
 #if defined(__AVX2__) || defined(__AVX__)
+#if defined(__AVX512F__)
+    #define C_UTILS_AVX512F
+    #define ALIGNMENT_512 sizeof(__m512)
+#endif
     #include <immintrin.h>
     #define C_UTILS_AVX
     #define ALIGNMENT_256 sizeof(__m256)
@@ -98,6 +102,13 @@ typedef ssize_t  ssize;
 
 #if defined(C_UTILS_GNUC_CLANG) && C_UTILS_HAS_BUILTIN(__builtin_bit_cast)
     #define C_UTILS_BITCAST(_t, _f) __builtin_bit_cast(_t, _f)
+#endif
+
+#if defined(C_UTILS_GNUC_CLANG) && C_UTILS_HAS_BUILTIN(__builtin_assume_aligned)
+    #define C_UTILS_ASSUME_ALIGNED(_exp, _align, ...) \
+        __builtin_assume_aligned(_exp, _align, ##__VA_ARGS__)
+#else 
+    #define C_UTILS_ASSUME_ALIGNED(_exp, _align, ...) _exp
 #endif
 
 #if defined(C_UTILS_GNUC_CLANG) && \

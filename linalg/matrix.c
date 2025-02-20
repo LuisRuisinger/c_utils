@@ -3,6 +3,7 @@
 //
 
 #include "matrix.h"
+#include "../assert/assert.h"
 
 void mat2x2_inverse(const Mat2x2 *__restrict__ src, Mat2x2 *__restrict__ dst) {
     f32 s = 1.0F / mat2x2_det(src);
@@ -155,8 +156,26 @@ void mat4x4_inverse_t(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) 
     ROW_128(dst, 3) = _mm_sub_ps(_mm_setr_ps(0.0F, 0.0F, 0.0F, 1.0F), _tmp_6);
 }
 
+void mat_mulv(const Mat *__restrict m, const Vec *__restrict v, Vec *__restrict w) {
+    if (m->n != v->m || m->m != w->m) {
+        ASSERT(false);
+    }
+    
+    f32 *m_val = C_UTILS_ASSUME_ALIGNED(m->val, sizeof(MAT_ALIGNMENT)); 
+    f32 *v_val = C_UTILS_ASSUME_ALIGNED(v->val, sizeof(MAT_ALIGNMENT)); 
+    f32 *w_val = C_UTILS_ASSUME_ALIGNED(w->val, sizeof(MAT_ALIGNMENT)); 
+}
 
 
+void mat_mulm(const Mat *__restrict a, const Mat *__restrict b, Mat *__restrict c) {
+    if (a->n != b->m || a->m != c->m || b->n != c->n) {
+        ASSERT(false);
+    }
+    
+    f32 *a_val = C_UTILS_ASSUME_ALIGNED(a->val, sizeof(MAT_ALIGNMENT)); 
+    f32 *b_val = C_UTILS_ASSUME_ALIGNED(b->val, sizeof(MAT_ALIGNMENT)); 
+    f32 *c_val = C_UTILS_ASSUME_ALIGNED(c->val, sizeof(MAT_ALIGNMENT)); 
+}
 
 
 
