@@ -1,7 +1,7 @@
 #ifndef C_UTILS_VEC_H
 #define C_UTILS_VEC_H
 
-#include "../defines.h"
+#include "defines.h"
 
 typedef struct Vec_t {
     

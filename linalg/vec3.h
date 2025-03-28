@@ -8,7 +8,7 @@
 #include <math.h>
 #include <stdatomic.h>
 
-#include "../defines.h"
+#include "defines.h"
 #include "vec4.h"
 
 C_GUARD_BEGINN()

@@ -1,7 +1,7 @@
 #ifndef C_UTILS_VEC2_H
 #define C_UTILS_VEC2_H
 
-#include "../defines.h"
+#include "defines.h"
 
 C_GUARD_BEGINN()
 

@@ -5,7 +5,7 @@
 #ifndef C_UTILS_VEC4_H
 #define C_UTILS_VEC4_H
 
-#include "../defines.h"
+#include "defines.h"
 
 C_GUARD_BEGINN()
 

@@ -1,11 +1,7 @@
-//
-// Created by Luis Ruisinger on 06.01.25.
-//
-
 #include "matrix.h"
-#include "../assert/assert.h"
+#include "assert/assert.h"
 
-void mat2x2_inverse(const Mat2x2 *__restrict__ src, Mat2x2 *__restrict__ dst) {
+void mat2x2_inverse(const Mat2x2 *__restrict src, Mat2x2 *__restrict dst) {
     f32 s = 1.0F / mat2x2_det(src);
 
     // this is strictly speaking wrong because we store 2 rows inside of one __m128
@@ -15,7 +11,7 @@ void mat2x2_inverse(const Mat2x2 *__restrict__ src, Mat2x2 *__restrict__ dst) {
     ROW_128(dst, 0) = _mm_mul_ps(ROW_128(dst, 0), _mm_set1_ps(s));
 }
 
-void mat4x4_inverse(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) {
+void mat4x4_inverse(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst) {
 
     // 4x4 matrices are stored in row-major order rather than column-major to speed up
     // 4x4 matrix vector and matrix multiplication
@@ -81,7 +77,7 @@ void mat4x4_inverse(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) {
     ROW_128(dst, 3) = _mm_shuffle_ps(_z, _w, _MM_SHUFFLE(0, 2, 0, 2));
 }
 
-void mat4x4_inverse_tns(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) {
+void mat4x4_inverse_tns(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst) {
 
     // 4x4 matrices are stored in row-major order rather than column-major to speed up
     // 4x4 matrix vector and matrix multiplication
@@ -113,7 +109,7 @@ void mat4x4_inverse_tns(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst
     ROW_128(dst, 3) = _mm_sub_ps(_mm_setr_ps(0.0F, 0.0F, 0.0F, 1.0F), _tmp_5);
 }
 
-void mat4x4_inverse_t(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) {
+void mat4x4_inverse_t(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst) {
 
     // 4x4 matrices are stored in row-major order rather than column-major to speed up
     // 4x4 matrix vector and matrix multiplication
@@ -158,7 +154,8 @@ void mat4x4_inverse_t(const Mat4x4 *__restrict__ src, Mat4x4 *__restrict__ dst) 
 
 void mat_mulv(const Mat *__restrict m, const Vec *__restrict v, Vec *__restrict w) {
     if (m->n != v->m || m->m != w->m) {
-        ASSERT(false);
+        // ASSERT(false);
+        exit(EXIT_FAILURE);
     }
     
     f32 *m_val = C_UTILS_ASSUME_ALIGNED(m->val, sizeof(MAT_ALIGNMENT)); 
@@ -166,15 +163,51 @@ void mat_mulv(const Mat *__restrict m, const Vec *__restrict v, Vec *__restrict 
     f32 *w_val = C_UTILS_ASSUME_ALIGNED(w->val, sizeof(MAT_ALIGNMENT)); 
 }
 
+void *linalg_malloc(usize align, usize n, usize m) {
+    n = RND_POW_2(n, MAT_ALIGNMENT);
+    m = RND_POW_2(m, MAT_ALIGNMENT);
+
+    return aligned_alloc(align, n * m * sizeof(f32));
+}
+
+usize l1_cache_size;
+usize l2_cache_size;
+usize l3_cache_size;
+
+#define L1_CACHE_SIZE l1_cache_size
+#define L2_CACHE_SIZE l2_cache_size
+#define L3_CACHE_SiZE l3_cache_size
+
+C_UTILS_ON_STARTUP void linalg_setup(void) {
+    LOG("hello");
+
+    /* TODO */
+    // call cpuid and fetch information about the cache layers 
+    // to build divide-and-conquer matrices based on cache information
+}
+
+#define DEFAULT_MAT_MAT_MUL
 
 void mat_mulm(const Mat *__restrict a, const Mat *__restrict b, Mat *__restrict c) {
     if (a->n != b->m || a->m != c->m || b->n != c->n) {
-        ASSERT(false);
+        // ASSERT(false);
+        LOG("ERROR");
+        exit(EXIT_FAILURE);
     }
     
     f32 *a_val = C_UTILS_ASSUME_ALIGNED(a->val, sizeof(MAT_ALIGNMENT)); 
     f32 *b_val = C_UTILS_ASSUME_ALIGNED(b->val, sizeof(MAT_ALIGNMENT)); 
     f32 *c_val = C_UTILS_ASSUME_ALIGNED(c->val, sizeof(MAT_ALIGNMENT)); 
+
+#ifdef DEFAULT_MAT_MAT_MUL
+    for (usize i = 0; i < a->m; ++i) {
+        for (usize j = 0; j < b->n; ++j) {
+            for (usize k = 0; k < a->n; ++k) {
+                c_val[i * c->n + j] += a_val[i * a->n + k] * b_val[k * b->n + j];
+            }
+        }
+    }
+#endif
 }
 
 

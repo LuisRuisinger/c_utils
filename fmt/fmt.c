@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include "fmt.h"
-#include "../util/datastructures/dynamic_array.h"
+#include "array/dynamic_array.h"
 
 static char *v_fmt(const char *fmt_str, va_list args) {
     char *ptr;
@@ -62,7 +62,7 @@ typedef struct LogHandler_t {
 
 LogHandler log_handler;
 
-void log_handler_init(void) {
+C_UTILS_ON_STARTUP void log_handler_init(void) {
     pthread_mutex_init(&log_handler.mutex, NULL);
 
     ARRAY_INIT(log_handler.callbacks, 8);
@@ -74,7 +74,7 @@ void log_handler_add_callback(i32 fd, ssize (* fun)(int, const void *, usize)) {
     ARRAY_PUSH_BACK(log_handler.callbacks, callback);
 }
 
-void PRINT_FMT(5, 6) fmt_log(
+PRINT_FMT(5, 6) void fmt_log(
         LogLevel level, const char *file, u32 line, const char *fun, const char *fmt_str, ...) {
     va_list args;
     va_start(args, fmt_str);
@@ -132,5 +132,6 @@ void PRINT_FMT(5, 6) fmt_log(
 
         pthread_mutex_unlock(&log_handler.mutex);
     }
+
     free(ptr);
 }

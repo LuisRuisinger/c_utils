@@ -293,10 +293,10 @@ C_UTILS_INLINE static inline void mat4x4_transpose(
 }
 
 C_UTILS_INLINE static inline vec4f mat4x4_mulv(const Mat4x4 *__restrict mat, vec4f v) {
-    __m128 _tmp_0 = _mm_mul_ps(ROW_128(mat, 0), _mm_set1_ps(GET_VEC4_X(v)));
-    __m128 _tmp_1 = _mm_fmadd_ps(ROW_128(mat, 1), _mm_set1_ps(GET_VEC4_Y(v)), _tmp_0);
-    __m128 _tmp_2 = _mm_fmadd_ps(ROW_128(mat, 2), _mm_set1_ps(GET_VEC4_Z(v)), _tmp_1);
-    __m128 _tmp_3 = _mm_fmadd_ps(ROW_128(mat, 3), _mm_set1_ps(GET_VEC4_W(v)), _tmp_2);
+    __m128 _tmp_0 = _mm_mul_ps(ROW_128(mat, 0), _mm_set1_ps(VEC4_GET(v, 0)));
+    __m128 _tmp_1 = _mm_fmadd_ps(ROW_128(mat, 1), _mm_set1_ps(VEC4_GET(v, 1)), _tmp_0);
+    __m128 _tmp_2 = _mm_fmadd_ps(ROW_128(mat, 2), _mm_set1_ps(VEC4_GET(v, 2)), _tmp_1);
+    __m128 _tmp_3 = _mm_fmadd_ps(ROW_128(mat, 3), _mm_set1_ps(VEC4_GET(v, 3)), _tmp_2);
 
     return (vec4f) { .vec = _tmp_3 };
 }
@@ -437,19 +437,24 @@ void mat4x4_inverse_t(const Mat4x4 *__restrict src, Mat4x4 *__restrict dst);
 
 
 /**
- * @brief Definition of an arbitrary m x n matrix.
+ * @brief Definition of an arbitrary run-time sized m x n matrix.
  *        The storage of such allocation will always be aligned to MAT_ALIGNMENT.
  *        The storage will always be padded to a multiple of 
  */
 typedef struct Mat_t {
-    // compiler assumption for the pointed to location to be aligned to MAT_ALIGNMENT
-    // the assumption will be applied through runtime overload of function using this type. 
-    f32 *val;
-
     // convention for width, height naming scheme of matrices
     // n is the width and m the height of the matrix
     usize n, m;
+
+    // compiler assumption for the pointed to location to be aligned to MAT_ALIGNMENT
+    // the assumption will be applied through runtime overload of function using this type. 
+    f32 *val;
 } Mat;
+
+#define MAT_GET(_mat, _x, _y) \
+    ((_y) * RND_POW_2((_mat)->n, MAT_ALIGNMENT) + (_x))
+
+void *linalg_malloc(usize align, usize n, usize m) ;
 
 void mat_mulv(const Mat *__restrict mat, const Vec *__restrict v, Vec *__restrict w);
 
